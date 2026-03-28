@@ -136,6 +136,4 @@ go test ./...
 go run -race ./cmd/gateway/ --config config.yaml
 ```
 
-## License
 
-Proprietary — Internal use only.
