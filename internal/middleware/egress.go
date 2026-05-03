@@ -73,17 +73,17 @@ func SafeTransport(allowedDomains []string) *http.Transport {
 func isPrivateIP(ip net.IP) bool {
 	// Known private/reserved CIDR ranges.
 	privateRanges := []string{
-		"10.0.0.0/8",      // Private Class A
-		"172.16.0.0/12",   // Private Class B
-		"192.168.0.0/16",  // Private Class C
-		"127.0.0.0/8",     // Loopback
-		"169.254.0.0/16",  // Link-local
-		"::1/128",         // IPv6 loopback
-		"fc00::/7",        // IPv6 Unique Local
-		"fe80::/10",       // IPv6 Link-local
-		"0.0.0.0/8",       // This network
-		"100.64.0.0/10",   // Shared address space (carrier NAT)
-		"198.18.0.0/15",   // Benchmark testing
+		"10.0.0.0/8",     // Private Class A
+		"172.16.0.0/12",  // Private Class B
+		"192.168.0.0/16", // Private Class C
+		"127.0.0.0/8",    // Loopback
+		"169.254.0.0/16", // Link-local
+		"::1/128",        // IPv6 loopback
+		"fc00::/7",       // IPv6 Unique Local
+		"fe80::/10",      // IPv6 Link-local
+		"0.0.0.0/8",      // This network
+		"100.64.0.0/10",  // Shared address space (carrier NAT)
+		"198.18.0.0/15",  // Benchmark testing
 	}
 
 	for _, cidr := range privateRanges {

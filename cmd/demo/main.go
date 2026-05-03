@@ -51,7 +51,8 @@ func main() {
 		allowlist,
 		50_000_000, // 50ms
 	)
-	redactor := pii.NewRedactor()
+	pe := pii.NewPolicyEngine()
+	redactor := pii.NewRedactor(pe)
 	rehydrator := pii.NewRehydrator()
 	adapter := &provider.GeminiAdapter{}
 
@@ -74,7 +75,7 @@ func main() {
 		fmt.Printf("--- TEST %d: %s ----------------------------------------\n", i+1, tc.name)
 
 		// Create per-request token map.
-		tokenMap, err := pii.NewTokenMap()
+		tokenMap, err := pii.NewInMemoryTokenMap()
 		if err != nil {
 			fmt.Printf("[ERROR] TokenMap: %v\n", err)
 			continue
@@ -95,7 +96,8 @@ func main() {
 		// STEP 3: Redact PII.
 		redactedText := tc.text
 		if len(matches) > 0 {
-			redactedText, _ = redactor.Redact(tc.text, matches, tokenMap)
+			userCtx := models.UserContext{Department: "GENERAL", UserID: "demo-user"}
+			redactedText, _ = redactor.Redact(tc.text, matches, tokenMap, userCtx)
 		}
 		fmt.Printf("\n  [STEP 3] REDACTED TEXT (what Gemini will see):\n")
 		fmt.Printf("  >> %s\n", redactedText)

@@ -87,3 +87,16 @@ logging:
 metrics:
   enabled: true
   path: "/metrics"
+
+experimental_features:
+  redis:
+    enabled: true
+    addr: "127.0.0.1:6379"
+    password: ""
+    db: 0
+    token_ttl: "1h"
+    encryption_key: "0123456789abcdef0123456789abcdef" # MUST BE 32 BYTES for AES-256
+  ner:
+    enabled: true
+    target: "127.0.0.1:50051"
+    timeout: "5s"

@@ -10,7 +10,7 @@ import (
 
 // HeaderScan scans configured HTTP headers and query parameters for PII,
 // replacing detected PII with redacted placeholders.
-func HeaderScan(pipeline *pii.Pipeline, redactor *pii.Redactor, tokenMap func(r *http.Request) *pii.TokenMap) func(http.Handler) http.Handler {
+func HeaderScan(pipeline *pii.Pipeline, redactor *pii.Redactor, tokenMap func(r *http.Request) pii.TokenMap) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			cfg := config.Get()
@@ -28,7 +28,8 @@ func HeaderScan(pipeline *pii.Pipeline, redactor *pii.Redactor, tokenMap func(r 
 				matches := pipeline.Detect(val)
 				if len(matches) > 0 {
 					tm := tokenMap(r)
-					redacted, _ := redactor.Redact(val, matches, tm)
+					userCtx := GetUserContext(r)
+					redacted, _ := redactor.Redact(val, matches, tm, userCtx)
 					r.Header.Set(header, redacted)
 				}
 			}
@@ -42,7 +43,8 @@ func HeaderScan(pipeline *pii.Pipeline, redactor *pii.Redactor, tokenMap func(r 
 						matches := pipeline.Detect(val)
 						if len(matches) > 0 {
 							tm := tokenMap(r)
-							redacted, _ := redactor.Redact(val, matches, tm)
+							userCtx := GetUserContext(r)
+							redacted, _ := redactor.Redact(val, matches, tm, userCtx)
 							values[i] = redacted
 							modified = true
 						}

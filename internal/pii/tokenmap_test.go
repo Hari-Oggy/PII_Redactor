@@ -5,7 +5,7 @@ import (
 )
 
 func TestTokenMap_StoreAndLookup(t *testing.T) {
-	tm, err := NewTokenMap()
+	tm, err := NewInMemoryTokenMap()
 	if err != nil {
 		t.Fatalf("failed to create token map: %v", err)
 	}
@@ -28,7 +28,7 @@ func TestTokenMap_StoreAndLookup(t *testing.T) {
 }
 
 func TestTokenMap_DeterministicToken(t *testing.T) {
-	tm, err := NewTokenMap()
+	tm, err := NewInMemoryTokenMap()
 	if err != nil {
 		t.Fatalf("failed to create token map: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestTokenMap_DeterministicToken(t *testing.T) {
 }
 
 func TestTokenMap_DifferentPIIDifferentTokens(t *testing.T) {
-	tm, err := NewTokenMap()
+	tm, err := NewInMemoryTokenMap()
 	if err != nil {
 		t.Fatalf("failed to create token map: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestTokenMap_DifferentPIIDifferentTokens(t *testing.T) {
 }
 
 func TestTokenMap_CleanupReleasesMemory(t *testing.T) {
-	tm, err := NewTokenMap()
+	tm, err := NewInMemoryTokenMap()
 	if err != nil {
 		t.Fatalf("failed to create token map: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestTokenMap_CleanupReleasesMemory(t *testing.T) {
 }
 
 func TestTokenMap_InjectionPrevention(t *testing.T) {
-	tm, err := NewTokenMap()
+	tm, err := NewInMemoryTokenMap()
 	if err != nil {
 		t.Fatalf("failed to create token map: %v", err)
 	}

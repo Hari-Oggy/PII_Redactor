@@ -47,4 +47,3 @@ func main() {
 		zaplog.L().Fatal("Server error", zap.Error(err))
 	}
 }
-

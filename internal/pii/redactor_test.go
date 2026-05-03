@@ -8,7 +8,7 @@ import (
 )
 
 func TestRedactAndRehydrate_RoundTrip(t *testing.T) {
-	tm, err := NewTokenMap()
+	tm, err := NewInMemoryTokenMap()
 	if err != nil {
 		t.Fatalf("failed to create token map: %v", err)
 	}
@@ -25,8 +25,8 @@ func TestRedactAndRehydrate_RoundTrip(t *testing.T) {
 	}
 
 	// Redact.
-	redactor := NewRedactor()
-	redacted, spans := redactor.Redact(original, matches, tm)
+	redactor := NewRedactor(NewPolicyEngine())
+	redacted, spans := redactor.Redact(original, matches, tm, models.UserContext{Department: "GENERAL"})
 
 	t.Logf("Original:  %s", original)
 	t.Logf("Redacted:  %s", redacted)
@@ -55,7 +55,7 @@ func TestRedactAndRehydrate_RoundTrip(t *testing.T) {
 }
 
 func TestRedact_PreservesNonPIIText(t *testing.T) {
-	tm, err := NewTokenMap()
+	tm, err := NewInMemoryTokenMap()
 	if err != nil {
 		t.Fatalf("failed to create token map: %v", err)
 	}
@@ -64,8 +64,8 @@ func TestRedact_PreservesNonPIIText(t *testing.T) {
 	original := "Hello, how are you today?"
 
 	matches := []models.PIIMatch{} // no PII
-	redactor := NewRedactor()
-	redacted, spans := redactor.Redact(original, matches, tm)
+	redactor := NewRedactor(NewPolicyEngine())
+	redacted, spans := redactor.Redact(original, matches, tm, models.UserContext{Department: "GENERAL"})
 
 	if redacted != original {
 		t.Errorf("expected unchanged text, got '%s'", redacted)

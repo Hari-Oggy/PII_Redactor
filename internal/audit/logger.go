@@ -12,8 +12,8 @@ import (
 
 // Logger writes audit entries to a file or stdout.
 type Logger struct {
-	mu     sync.Mutex
-	file   *os.File
+	mu      sync.Mutex
+	file    *os.File
 	encoder *json.Encoder
 }
 

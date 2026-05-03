@@ -86,4 +86,3 @@ func (d *BlocklistDetector) GetTerms() []string {
 	copy(out, d.terms)
 	return out
 }
-

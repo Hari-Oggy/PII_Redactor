@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/enterprise/pii-gateway/internal/middleware"
 	"github.com/enterprise/pii-gateway/internal/pii"
 )
 
@@ -32,7 +33,7 @@ func NewStreamingProxy(pipeline *pii.Pipeline, redactor *pii.Redactor, rehydrato
 
 // ProxySSE streams an SSE response from the upstream, scanning each chunk
 // for PII with an overlap buffer to handle boundary-split patterns.
-func (sp *StreamingProxy) ProxySSE(w http.ResponseWriter, upstream io.Reader, tokenMap *pii.TokenMap, requestID string) error {
+func (sp *StreamingProxy) ProxySSE(w http.ResponseWriter, upstream io.Reader, tokenMap pii.TokenMap, uctx middleware.UserContext, requestID string) error {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		return fmt.Errorf("streaming not supported")
@@ -62,7 +63,7 @@ func (sp *StreamingProxy) ProxySSE(w http.ResponseWriter, upstream io.Reader, to
 			output := data
 			if len(matches) > 0 {
 				// Redact PII in the full scan window.
-				redacted, _ := sp.redactor.Redact(windowStr, matches, tokenMap)
+				redacted, _ := sp.redactor.Redact(windowStr, matches, tokenMap, uctx)
 
 				// Extract only the non-overlap portion from the redacted result.
 				// The overlap portion will be re-scanned with the next chunk.
@@ -91,4 +92,3 @@ func (sp *StreamingProxy) ProxySSE(w http.ResponseWriter, upstream io.Reader, to
 
 	return nil
 }
-

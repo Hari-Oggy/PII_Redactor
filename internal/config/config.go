@@ -16,50 +16,51 @@ import (
 // Config is the top-level, immutable configuration struct.
 // It is swapped atomically via atomic.Pointer on hot-reload.
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Proxy    ProxyConfig    `mapstructure:"proxy"`
-	PII      PIIConfig      `mapstructure:"pii"`
-	Auth     AuthConfig     `mapstructure:"auth"`
-	Admin    AdminConfig    `mapstructure:"admin"`
-	Logging  LoggingConfig  `mapstructure:"logging"`
-	Metrics  MetricsConfig  `mapstructure:"metrics"`
+	Server  ServerConfig  `mapstructure:"server"`
+	Proxy   ProxyConfig   `mapstructure:"proxy"`
+	PII     PIIConfig     `mapstructure:"pii"`
+	Auth    AuthConfig    `mapstructure:"auth"`
+	Admin   AdminConfig   `mapstructure:"admin"`
+	Logging              LoggingConfig              `mapstructure:"logging"`
+	Metrics              MetricsConfig              `mapstructure:"metrics"`
+	ExperimentalFeatures ExperimentalFeaturesConfig `mapstructure:"experimental_features"`
 }
 
 // ServerConfig holds HTTP server settings.
 type ServerConfig struct {
-	ProxyAddr        string        `mapstructure:"proxy_addr"`         // e.g. ":8080"
-	AdminAddr        string        `mapstructure:"admin_addr"`         // e.g. "127.0.0.1:9090"
-	ReadTimeout      time.Duration `mapstructure:"read_timeout"`
-	WriteTimeout     time.Duration `mapstructure:"write_timeout"`
-	IdleTimeout      time.Duration `mapstructure:"idle_timeout"`
-	ShutdownTimeout  time.Duration `mapstructure:"shutdown_timeout"`
-	MaxConcurrency   int           `mapstructure:"max_concurrency"`    // semaphore size
-	MaxBodyBytes     int64         `mapstructure:"max_body_bytes"`     // body size limit
-	TLSCertFile      string        `mapstructure:"tls_cert_file"`
-	TLSKeyFile       string        `mapstructure:"tls_key_file"`
-	TLSClientCAFile  string        `mapstructure:"tls_client_ca_file"` // mTLS
+	ProxyAddr       string        `mapstructure:"proxy_addr"` // e.g. ":8080"
+	AdminAddr       string        `mapstructure:"admin_addr"` // e.g. "127.0.0.1:9090"
+	ReadTimeout     time.Duration `mapstructure:"read_timeout"`
+	WriteTimeout    time.Duration `mapstructure:"write_timeout"`
+	IdleTimeout     time.Duration `mapstructure:"idle_timeout"`
+	ShutdownTimeout time.Duration `mapstructure:"shutdown_timeout"`
+	MaxConcurrency  int           `mapstructure:"max_concurrency"` // semaphore size
+	MaxBodyBytes    int64         `mapstructure:"max_body_bytes"`  // body size limit
+	TLSCertFile     string        `mapstructure:"tls_cert_file"`
+	TLSKeyFile      string        `mapstructure:"tls_key_file"`
+	TLSClientCAFile string        `mapstructure:"tls_client_ca_file"` // mTLS
 }
 
 // ProxyConfig holds upstream proxy settings.
 type ProxyConfig struct {
-	UpstreamTimeout time.Duration `mapstructure:"upstream_timeout"` // e.g. 120s
+	UpstreamTimeout time.Duration    `mapstructure:"upstream_timeout"` // e.g. 120s
 	Providers       []ProviderConfig `mapstructure:"providers"`
 }
 
 // ProviderConfig holds per-provider upstream settings.
 type ProviderConfig struct {
-	Name              string        `mapstructure:"name"`              // "openai", "anthropic", "azure"
-	BaseURL           string        `mapstructure:"base_url"`
-	APIKeyEnv         string        `mapstructure:"api_key_env"`       // env var name holding the key
-	PathPrefix        string        `mapstructure:"path_prefix"`       // route prefix, e.g. "/openai"
-	CircuitBreaker    CBConfig      `mapstructure:"circuit_breaker"`
+	Name           string   `mapstructure:"name"` // "openai", "anthropic", "azure"
+	BaseURL        string   `mapstructure:"base_url"`
+	APIKeyEnv      string   `mapstructure:"api_key_env"` // env var name holding the key
+	PathPrefix     string   `mapstructure:"path_prefix"` // route prefix, e.g. "/openai"
+	CircuitBreaker CBConfig `mapstructure:"circuit_breaker"`
 }
 
 // CBConfig configures the circuit breaker for a provider.
 type CBConfig struct {
-	MaxFailures       uint32        `mapstructure:"max_failures"`      // failures before open
-	Timeout           time.Duration `mapstructure:"timeout"`           // open → half-open wait
-	MaxHalfOpen       uint32        `mapstructure:"max_half_open"`     // requests in half-open
+	MaxFailures uint32        `mapstructure:"max_failures"`  // failures before open
+	Timeout     time.Duration `mapstructure:"timeout"`       // open → half-open wait
+	MaxHalfOpen uint32        `mapstructure:"max_half_open"` // requests in half-open
 }
 
 // PIIConfig holds PII detection and redaction settings.
@@ -78,7 +79,7 @@ type AuthConfig struct {
 	Enabled          bool     `mapstructure:"enabled"`
 	JWTSecret        string   `mapstructure:"jwt_secret"`
 	JWTPublicKeyFile string   `mapstructure:"jwt_public_key_file"`
-	APIKeys          []string `mapstructure:"api_keys"`            // static API key list
+	APIKeys          []string `mapstructure:"api_keys"` // static API key list
 }
 
 // AdminConfig holds admin API settings.
@@ -97,6 +98,29 @@ type LoggingConfig struct {
 type MetricsConfig struct {
 	Enabled bool   `mapstructure:"enabled"`
 	Path    string `mapstructure:"path"` // e.g. "/metrics"
+}
+
+// ExperimentalFeaturesConfig holds experimental features settings.
+type ExperimentalFeaturesConfig struct {
+	Redis RedisConfig `mapstructure:"redis"`
+	NER   NERConfig   `mapstructure:"ner"`
+}
+
+// RedisConfig holds Redis token map settings.
+type RedisConfig struct {
+	Enabled       bool          `mapstructure:"enabled"`
+	Addr          string        `mapstructure:"addr"`
+	Password      string        `mapstructure:"password"`
+	DB            int           `mapstructure:"db"`
+	TokenTTL      time.Duration `mapstructure:"token_ttl"`
+	EncryptionKey string        `mapstructure:"encryption_key"`
+}
+
+// NERConfig holds NER sidecar settings.
+type NERConfig struct {
+	Enabled bool          `mapstructure:"enabled"`
+	Target  string        `mapstructure:"target"`
+	Timeout time.Duration `mapstructure:"timeout"`
 }
 
 // configPtr is the global atomic pointer to the current Config.

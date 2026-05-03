@@ -13,12 +13,23 @@ import (
 	"sync"
 )
 
-// TokenMap holds the bidirectional mapping between PII values and their
+// TokenMap defines the interface for bidirectional mapping between PII values
+// and their replacement tokens.
+type TokenMap interface {
+	Store(piiValue, piiType string) string
+	Lookup(token string) (string, bool)
+	VerifyAndLookup(token string) (string, bool)
+	Count() int
+	Clear()
+	GetAllTokens() []string
+}
+
+// InMemoryTokenMap holds the bidirectional mapping between PII values and their
 // replacement tokens. It is scoped to a single request via context and
 // cleaned up automatically when the context is cancelled.
 // PII values are encrypted at rest using AES-256-GCM to protect against
 // heap dump attacks.
-type TokenMap struct {
+type InMemoryTokenMap struct {
 	mu            sync.RWMutex
 	piiToToken    map[string]string // original PII → token
 	tokenToPII    map[string][]byte // token → encrypted PII (AES-GCM ciphertext)
@@ -26,9 +37,9 @@ type TokenMap struct {
 	cipher        *PIICipher        // AES-256-GCM cipher for PII encryption
 }
 
-// NewTokenMap creates a new TokenMap with a fresh per-request HMAC secret
+// NewInMemoryTokenMap creates a new InMemoryTokenMap with a fresh per-request HMAC secret
 // and AES-256-GCM encryption for stored PII values.
-func NewTokenMap() (*TokenMap, error) {
+func NewInMemoryTokenMap() (*InMemoryTokenMap, error) {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
 		return nil, fmt.Errorf("generate HMAC secret: %w", err)
@@ -40,7 +51,7 @@ func NewTokenMap() (*TokenMap, error) {
 		cipher = nil
 	}
 
-	return &TokenMap{
+	return &InMemoryTokenMap{
 		piiToToken:    make(map[string]string),
 		tokenToPII:    make(map[string][]byte),
 		requestSecret: secret,
@@ -56,7 +67,7 @@ const (
 
 // generateToken creates a unique HMAC-signed token for a PII value.
 // Format: __PII_{uuid}_{hmac}__
-func (tm *TokenMap) generateToken(piiType string) string {
+func (tm *InMemoryTokenMap) generateToken(piiType string) string {
 	// Generate 8 random bytes → 16 hex chars for uniqueness.
 	uuidBytes := make([]byte, 8)
 	_, _ = rand.Read(uuidBytes) // crypto/rand; error extremely unlikely
@@ -74,7 +85,7 @@ func (tm *TokenMap) generateToken(piiType string) string {
 // If the same PII value was already stored, returns the existing token
 // (deterministic replacement for the same PII within one request).
 // The PII value is encrypted with AES-256-GCM before storage.
-func (tm *TokenMap) Store(piiValue, piiType string) string {
+func (tm *InMemoryTokenMap) Store(piiValue, piiType string) string {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 
@@ -105,7 +116,7 @@ func (tm *TokenMap) Store(piiValue, piiType string) string {
 // Lookup retrieves the original PII value for a given token.
 // Decrypts the stored ciphertext before returning.
 // Returns the original value and true if found, or ("", false) if not.
-func (tm *TokenMap) Lookup(token string) (string, bool) {
+func (tm *InMemoryTokenMap) Lookup(token string) (string, bool) {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
 	encrypted, ok := tm.tokenToPII[token]
@@ -121,7 +132,7 @@ func (tm *TokenMap) Lookup(token string) (string, bool) {
 //
 // Token format: __PII_{type}_{uuid}_{hmac}__
 // Verification: recompute HMAC-SHA256(uuid, requestSecret) and compare.
-func (tm *TokenMap) VerifyAndLookup(token string) (string, bool) {
+func (tm *InMemoryTokenMap) VerifyAndLookup(token string) (string, bool) {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
 
@@ -151,7 +162,7 @@ func (tm *TokenMap) VerifyAndLookup(token string) (string, bool) {
 
 // decryptPII decrypts an encrypted PII value. Falls back to treating the
 // data as plaintext if decryption fails (e.g., cipher not available).
-func (tm *TokenMap) decryptPII(data []byte) string {
+func (tm *InMemoryTokenMap) decryptPII(data []byte) string {
 	if tm.cipher != nil {
 		plaintext, err := tm.cipher.Decrypt(data)
 		if err == nil {
@@ -192,15 +203,26 @@ func parseToken(token string) (string, string, bool) {
 	return uuidPart, hmacPart, true
 }
 
+// GetAllTokens returns all tokens currently stored in the map.
+func (tm *InMemoryTokenMap) GetAllTokens() []string {
+	tm.mu.RLock()
+	defer tm.mu.RUnlock()
+	tokens := make([]string, 0, len(tm.tokenToPII))
+	for token := range tm.tokenToPII {
+		tokens = append(tokens, token)
+	}
+	return tokens
+}
+
 // Count returns the number of PII mappings stored.
-func (tm *TokenMap) Count() int {
+func (tm *InMemoryTokenMap) Count() int {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
 	return len(tm.piiToToken)
 }
 
 // Clear removes all mappings, releasing memory.
-func (tm *TokenMap) Clear() {
+func (tm *InMemoryTokenMap) Clear() {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 	tm.piiToToken = nil

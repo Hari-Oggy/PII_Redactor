@@ -22,7 +22,7 @@ func NewRehydrator() *Rehydrator {
 // ones with their original values from the TokenMap.
 // Tokens that fail HMAC verification (e.g., LLM-fabricated tokens)
 // are left as-is, preventing injection attacks.
-func (r *Rehydrator) Rehydrate(text string, tm *TokenMap) string {
+func (r *Rehydrator) Rehydrate(text string, tm TokenMap) string {
 	if tm.Count() == 0 {
 		return text
 	}
@@ -41,12 +41,7 @@ func (r *Rehydrator) Rehydrate(text string, tm *TokenMap) string {
 
 	// Also handle any exact tokens that might not match the regex
 	// (defensive — iterate verified tokens only).
-	tm.mu.RLock()
-	tokens := make([]string, 0, len(tm.tokenToPII))
-	for token := range tm.tokenToPII {
-		tokens = append(tokens, token)
-	}
-	tm.mu.RUnlock()
+	tokens := tm.GetAllTokens()
 
 	for _, token := range tokens {
 		if strings.Contains(result, token) {
@@ -60,4 +55,3 @@ func (r *Rehydrator) Rehydrate(text string, tm *TokenMap) string {
 
 	return result
 }
-

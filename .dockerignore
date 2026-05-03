@@ -1,0 +1,38 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+pii-gateway
+
+# Git
+.git
+.gitignore
+
+# Go
+*.test
+*.out
+vendor/
+
+# Python / sidecar local generated or cache
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Secrets
+api.key.txt
+*.key
+*.pem
+.env.*
+
+# IDEs
+.idea/
+.vscode/
+
+# OS Data
+.DS_Store
+Thumbs.db

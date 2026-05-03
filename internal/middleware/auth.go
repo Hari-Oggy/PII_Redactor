@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/enterprise/pii-gateway/internal/config"
+	"github.com/enterprise/pii-gateway/pkg/models"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -15,6 +16,25 @@ type contextKey string
 
 // UserIDKey is the context key for the authenticated user ID (from JWT sub claim).
 const UserIDKey contextKey = "user_id"
+
+// UserContextKey is the context key for the immutable UserContext.
+const UserContextKey contextKey = "user_context"
+
+// UserContext is an alias to the models.UserContext type.
+type UserContext = models.UserContext
+
+// WithUserContext stores a UserContext in the request context.
+func WithUserContext(ctx context.Context, uc UserContext) context.Context {
+	return context.WithValue(ctx, UserContextKey, uc)
+}
+
+// GetUserContext retrieves the UserContext from the request context.
+func GetUserContext(r *http.Request) UserContext {
+	if uc, ok := r.Context().Value(UserContextKey).(UserContext); ok {
+		return uc
+	}
+	return UserContext{Department: "GENERAL"}
+}
 
 // Auth validates requests using JWT tokens or static API keys.
 func Auth(next http.Handler) http.Handler {
@@ -26,14 +46,19 @@ func Auth(next http.Handler) http.Handler {
 		}
 
 		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			http.Error(w, `{"error":"missing Authorization header"}`, http.StatusUnauthorized)
-			return
+		token := ""
+
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			token = strings.TrimPrefix(authHeader, "Bearer ")
+		} else if qToken := r.URL.Query().Get("token"); qToken != "" {
+			// WebSockets from browser cannot set Auth headers, so we allow ?token=
+			token = qToken
 		}
 
-		// Check Bearer token.
-		if strings.HasPrefix(authHeader, "Bearer ") {
-			token := strings.TrimPrefix(authHeader, "Bearer ")
+		if token == "" {
+			http.Error(w, `{"error":"missing Authorization header or token parameter"}`, http.StatusUnauthorized)
+			return
+		}
 
 			// Check against static API keys first.
 			for _, key := range cfg.Auth.APIKeys {
@@ -50,17 +75,30 @@ func Auth(next http.Handler) http.Handler {
 				return
 			}
 
-			// Extract user ID from "sub" claim and store in context.
+			// Extract user ID and department, store immutable UserContext
+			userID := "unknown"
 			if sub, ok := claims["sub"].(string); ok {
-				ctx := context.WithValue(r.Context(), UserIDKey, sub)
-				r = r.WithContext(ctx)
+				userID = sub
 			}
+			
+			department := "GENERAL"
+			if dept, ok := claims["department"].(string); ok {
+				department = dept
+			}
+
+			uctx := UserContext{
+				UserID:     userID,
+				Department: department,
+			}
+
+			// Store both for backwards compatibility until full migration
+			ctx := context.WithValue(r.Context(), UserIDKey, userID)
+			ctx = WithUserContext(ctx, uctx)
+			
+			r = r.WithContext(ctx)
 
 			next.ServeHTTP(w, r)
 			return
-		}
-
-		http.Error(w, `{"error":"unsupported auth scheme"}`, http.StatusUnauthorized)
 	})
 }
 

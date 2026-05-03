@@ -2,12 +2,17 @@
 package admin
 
 import (
+	"embed"
 	"encoding/json"
+	"io/fs"
 	"net/http"
 
 	"github.com/enterprise/pii-gateway/internal/config"
 	"github.com/enterprise/pii-gateway/internal/pii"
 )
+
+//go:embed ui/dist/*
+var uiFS embed.FS
 
 // Handler serves admin API endpoints on a separate port.
 type Handler struct {
@@ -29,6 +34,12 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/readyz", h.readyz)
 	mux.HandleFunc("/admin/blocklist", h.adminAuth(h.handleBlocklist))
 	mux.HandleFunc("/admin/config/reload", h.adminAuth(h.handleConfigReload))
+
+	// Serve the React Dashboard UI from the embedded filesystem
+	distFS, err := fs.Sub(uiFS, "ui/dist")
+	if err == nil {
+		mux.Handle("/", http.FileServer(http.FS(distFS)))
+	}
 }
 
 // adminAuth wraps a handler with admin API key authentication.
@@ -121,4 +132,3 @@ func (h *Handler) handleConfigReload(w http.ResponseWriter, r *http.Request) {
 		"admin_addr": cfg.Server.AdminAddr,
 	})
 }
-

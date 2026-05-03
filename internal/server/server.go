@@ -40,8 +40,21 @@ func New(cfg *config.Config) *Server {
 	allowlist := pii.NewAllowlist(cfg.PII.Allowlist)
 
 	detectors := []pii.Detector{regexDetector, blocklistDetector}
+
+	if cfg.ExperimentalFeatures.NER.Enabled {
+		nerDetector, err := pii.NewNERDetector(cfg.ExperimentalFeatures.NER.Target, cfg.ExperimentalFeatures.NER.Timeout)
+		if err == nil {
+			detectors = append(detectors, nerDetector)
+			log.Printf("NER Detector initialized (target: %s)", cfg.ExperimentalFeatures.NER.Target)
+		} else {
+			log.Printf("WARN: Failed to initialize NER detector: %v", err)
+		}
+	}
+
 	pipeline := pii.NewPipeline(detectors, cfg.PII.ConfidenceThreshold, allowlist, cfg.PII.RegexTimeout)
-	redactor := pii.NewRedactor()
+
+	policyEngine := pii.NewPolicyEngine()
+	redactor := pii.NewRedactor(policyEngine)
 	rehydrator := pii.NewRehydrator()
 
 	// === Build Audit Logger ===
@@ -96,7 +109,7 @@ func New(cfg *config.Config) *Server {
 	r.Use(pii.TokenMapMiddleware)
 
 	// Header + query param PII scanning.
-	tokenMapFn := func(r *http.Request) *pii.TokenMap {
+	tokenMapFn := func(r *http.Request) pii.TokenMap {
 		return pii.GetTokenMap(r.Context())
 	}
 	r.Use(middleware.HeaderScan(pipeline, redactor, tokenMapFn))

@@ -47,6 +47,19 @@ type NormalisedContent struct {
 	Fields map[string]string
 }
 
+// UserContext carries user information extracted from authentication tokens or headers.
+// It is used for RBAC and audit logging.
+type UserContext struct {
+	// UserID is the unique identifier of the authenticated user (e.g., from JWT sub claim).
+	UserID string
+
+	// Email is the user's email address.
+	Email string
+
+	// Department is the user's organizational unit for RBAC policies.
+	Department string
+}
+
 // AuditEntry represents a single auditable event in the gateway.
 type AuditEntry struct {
 	// RequestID is the correlation ID (X-Request-ID) for this request.

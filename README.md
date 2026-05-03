@@ -42,21 +42,44 @@ The gateway starts two servers:
 
 Send requests through the gateway using provider path prefixes:
 
+### Bash / macOS / Linux
+
 ```bash
 # OpenAI
 curl http://localhost:8080/openai/v1/chat/completions \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_OPENAI_KEY" \
   -d '{"model":"gpt-4","messages":[{"role":"user","content":"My SSN is 123-45-6789"}]}'
 
-# Anthropic
-curl http://localhost:8080/anthropic/v1/messages \
-  -H "Content-Type: application/json" \
-  -d '{"model":"claude-3","messages":[{"role":"user","content":"Email me at john@example.com"}]}'
-
 # Gemini
-curl http://localhost:8080/gemini/v1beta/models/gemini-pro:generateContent \
+curl "http://localhost:8080/gemini/v1beta/models/gemini-2.5-flash:generateContent?key=YOUR_GEMINI_KEY" \
   -H "Content-Type: application/json" \
   -d '{"contents":[{"parts":[{"text":"Call me at 555-123-4567"}]}]}'
+```
+
+### Windows PowerShell
+
+```powershell
+# OpenAI
+$body = @{
+    model = "gpt-4"
+    messages = @( @{ role = "user"; content = "My SSN is 123-45-6789" } )
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:8080/openai/v1/chat/completions" `
+  -Method Post `
+  -Headers @{ "Content-Type" = "application/json"; "Authorization" = "Bearer YOUR_OPENAI_KEY" } `
+  -Body $body
+
+# Gemini
+$body = @{
+    contents = @( @{ parts = @( @{ text = "Call me at 555-123-4567" } ) } )
+} | ConvertTo-Json -Depth 10
+
+Invoke-RestMethod -Uri "http://localhost:8080/gemini/v1beta/models/gemini-2.5-flash:generateContent?key=YOUR_GEMINI_KEY" `
+  -Method Post `
+  -Headers @{ "Content-Type" = "application/json" } `
+  -Body $body
 ```
 
 PII is automatically detected, replaced with HMAC-signed tokens, and restored in the response.
@@ -96,12 +119,121 @@ curl http://localhost:9090/metrics
 
 ## Architecture
 
+### 1. System Architecture
+
+```mermaid
+flowchart TD
+    Client([Client Application])
+    Admin([Security Admin])
+    LLM([External LLM API])
+    Audit[(JSON Audit Log)]
+
+    subgraph Gateway [Go Proxy Server :8080]
+        direction TB
+        Auth[Auth Middleware]
+        PG[Prompt Guard]
+        
+        subgraph PII_Engine [PII Detection Engine]
+            direction LR
+            Regex["Fast Regex\n(SSN, Email, Keys)"]
+            ML["Python ML NER Sidecar\n(Names, Locations)"]
+            Block[Dynamic Blocklist]
+        end
+        
+        TokenMap[(In-Memory Token Map\nAES-256 Encrypted)]
+        
+        Auth --> PG --> PII_Engine
+        PII_Engine -. Save Mapping .-> TokenMap
+        PII_Engine --> SSRF[SSRF-Safe Transport]
+        
+        Rehydrate[Token Rehydrator]
+        TokenMap -. Restore Data .-> Rehydrate
+    end
+
+    subgraph Admin_Server [Go Admin Server :9090]
+        AdminUI[Admin API / React Dashboard]
+    end
+
+    Client -- Original Request --> Auth
+    SSRF -- Redacted Request --> LLM
+    LLM -- Redacted Response --> Rehydrate
+    Rehydrate -- Original Response --> Client
+    
+    PII_Engine -. Log Event .-> Audit
+    
+    Admin -- X-Admin-Key --> AdminUI
+    AdminUI -- Live Update --> Block
 ```
-Client → [Auth] → [PromptGuard] → [HeaderScan] → [BodyLimit]
-       → [PII Detect + Redact] → [SSRF-Safe Transport] → LLM API
-       ← [PII Detect Response] → [HMAC Verify + Rehydrate] → Client
-       → [Audit Log]
+
+### 2. Sequence Diagram (Token-Map Round Trip)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Employee
+    participant Gateway as Go Gateway
+    participant Regex as Fast Regex
+    participant NER as ML Sidecar
+    participant TokenMap as Encrypted Token Map
+    participant LLM as External LLM (OpenAI/Gemini)
+
+    Employee->>Gateway: Send prompt with PII\n"My SSN is 123-45"
+    
+    par Concurrent PII Detection
+        Gateway->>Regex: Scan for structured data (50ms timeout)
+        Gateway->>NER: Scan for unstructured data (5s timeout)
+    end
+    
+    Regex-->>Gateway: Found: SSN
+    NER-->>Gateway: No Matches
+    
+    Gateway->>TokenMap: Save mapping: <PII_SSN_X> -> "123-45"
+    Gateway->>LLM: Forward sanitized prompt\n"My SSN is <PII_SSN_X>"
+    
+    LLM-->>Gateway: LLM Response\n"Your SSN <PII_SSN_X> is recorded."
+    
+    Gateway->>TokenMap: Lookup original value for <PII_SSN_X>
+    TokenMap-->>Gateway: "123-45"
+    
+    Gateway-->>Employee: Rehydrated Response\n"Your SSN 123-45 is recorded."
 ```
+
+### 3. Data Flow Diagram (State Changes)
+
+```mermaid
+flowchart LR
+    %% External Entities
+    Client[/Employee Application/]
+    LLM[/LLM Provider API/]
+    
+    %% Data Stores
+    TokenMap[(In-Memory\nToken Map)]
+    AuditLog[(JSON Audit Log)]
+    
+    %% Processes
+    subgraph Gateway [PII Redactor Gateway]
+        direction TB
+        Detect(1. Detect PII)
+        Redact(2. Redact & Tokenize)
+        Rehydrate(3. Rehydrate Tokens)
+    end
+    
+    %% Data Flow
+    Client -- "Raw Prompt\n(e.g., 'My SSN is 123-45')" --> Detect
+    Detect -- "Identified Entities" --> Redact
+    
+    Redact -- "Save Mapping\n<PII_SSN_X> = 123-45" --> TokenMap
+    Redact -. "Audit Event\n(1 PII detected)" .-> AuditLog
+    
+    Redact -- "Sanitized Prompt\n(e.g., 'My SSN is <PII_SSN_X>')" --> LLM
+    
+    LLM -- "Generated Output\n(e.g., 'I see your SSN <PII_SSN_X>')" --> Rehydrate
+    
+    TokenMap -- "Retrieve Mapping\n<PII_SSN_X> = 123-45" --> Rehydrate
+    
+    Rehydrate -- "Clean Output\n(e.g., 'I see your SSN 123-45')" --> Client
+```
+
 
 ## Project Structure
 
@@ -137,3 +269,4 @@ go run -race ./cmd/gateway/ --config config.yaml
 ```
 
 
+Proprietary — Internal use only.

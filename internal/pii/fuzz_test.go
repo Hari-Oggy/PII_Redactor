@@ -3,6 +3,8 @@ package pii
 import (
 	"testing"
 	"time"
+
+	"github.com/enterprise/pii-gateway/pkg/models"
 )
 
 // FuzzRegexDetector tests the regex detector with random inputs to find
@@ -52,7 +54,7 @@ func FuzzTokenMapStoreAndLookup(f *testing.F) {
 	f.Add("special chars: !@#$%^&*()", "text")
 
 	f.Fuzz(func(t *testing.T, value, piiType string) {
-		tm, err := NewTokenMap()
+		tm, err := NewInMemoryTokenMap()
 		if err != nil {
 			t.Fatalf("NewTokenMap: %v", err)
 		}
@@ -96,7 +98,7 @@ func FuzzRehydrator(f *testing.F) {
 			return // skip very long inputs
 		}
 
-		tm, err := NewTokenMap()
+		tm, err := NewInMemoryTokenMap()
 		if err != nil {
 			t.Fatalf("NewTokenMap: %v", err)
 		}
@@ -105,8 +107,8 @@ func FuzzRehydrator(f *testing.F) {
 		detector := NewRegexDetector()
 		matches := detector.Detect(input, 50*time.Millisecond)
 
-		redactor := NewRedactor()
-		redacted, _ := redactor.Redact(input, matches, tm)
+		redactor := NewRedactor(NewPolicyEngine())
+		redacted, _ := redactor.Redact(input, matches, tm, models.UserContext{Department: "GENERAL"})
 
 		rehydrator := NewRehydrator()
 		restored := rehydrator.Rehydrate(redacted, tm)

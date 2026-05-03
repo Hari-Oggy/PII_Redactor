@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/enterprise/pii-gateway/pkg/models"
 )
 
 // BenchmarkRegexDetector_ShortText benchmarks PII detection on a short string.
@@ -55,7 +57,7 @@ func BenchmarkPipeline_Detect(b *testing.B) {
 
 // BenchmarkTokenMap_StoreAndLookup benchmarks token map operations.
 func BenchmarkTokenMap_StoreAndLookup(b *testing.B) {
-	tm, _ := NewTokenMap()
+		tm, _ := NewInMemoryTokenMap()
 	defer tm.Clear()
 
 	b.ResetTimer()
@@ -67,7 +69,7 @@ func BenchmarkTokenMap_StoreAndLookup(b *testing.B) {
 
 // BenchmarkTokenMap_VerifyAndLookup benchmarks HMAC-verified lookups.
 func BenchmarkTokenMap_VerifyAndLookup(b *testing.B) {
-	tm, _ := NewTokenMap()
+		tm, _ := NewInMemoryTokenMap()
 	defer tm.Clear()
 
 	// Pre-store tokens.
@@ -86,14 +88,14 @@ func BenchmarkTokenMap_VerifyAndLookup(b *testing.B) {
 func BenchmarkRedactAndRehydrate(b *testing.B) {
 	text := "Email: alice@corp.com, SSN: 111-22-3333, Phone: (555) 999-0000"
 	detector := NewRegexDetector()
-	redactor := NewRedactor()
+	redactor := NewRedactor(NewPolicyEngine())
 	rehydrator := NewRehydrator()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		tm, _ := NewTokenMap()
+			tm, _ := NewInMemoryTokenMap()
 		matches := detector.Detect(text, 50*time.Millisecond)
-		redacted, _ := redactor.Redact(text, matches, tm)
+		redacted, _ := redactor.Redact(text, matches, tm, models.UserContext{Department: "GENERAL"})
 		rehydrator.Rehydrate(redacted, tm)
 		tm.Clear()
 	}

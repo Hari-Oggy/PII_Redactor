@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package ner;
+
+option go_package = "sysMon/internal/pii/nerpb";
+
+service NERService {
+    rpc Analyze(AnalyzeRequest) returns (AnalyzeResponse) {}
+}
+
+message AnalyzeRequest {
+    string text = 1;
+    // Optional: correlation ID for tracing
+    string request_id = 2;
+}
+
+message Entity {
+    string entity_type = 1;
+    int32 start = 2;
+    int32 end = 3;
+    float score = 4;
+}
+
+message AnalyzeResponse {
+    repeated Entity entities = 1;
+}

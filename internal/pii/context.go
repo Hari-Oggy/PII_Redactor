@@ -16,7 +16,7 @@ type tmKey struct{}
 // and the proxy handler without duplicating the token map.
 func TokenMapMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tm, err := NewTokenMap()
+		tm, err := NewInMemoryTokenMap()
 		if err != nil {
 			log.Printf("ERROR: failed to create token map: %v", err)
 			http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
@@ -31,8 +31,8 @@ func TokenMapMiddleware(next http.Handler) http.Handler {
 
 // GetTokenMap retrieves the per-request TokenMap from the context.
 // Returns nil if no TokenMap is stored (should not happen if middleware is wired).
-func GetTokenMap(ctx context.Context) *TokenMap {
-	if tm, ok := ctx.Value(tmKey{}).(*TokenMap); ok {
+func GetTokenMap(ctx context.Context) TokenMap {
+	if tm, ok := ctx.Value(tmKey{}).(TokenMap); ok {
 		return tm
 	}
 	return nil

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/enterprise/pii-gateway/internal/pii"
+	"github.com/enterprise/pii-gateway/pkg/models"
 )
 
 // TestEndToEnd_PIIRedactionRoundTrip simulates the full pipeline:
@@ -26,7 +27,8 @@ func TestEndToEnd_PIIRedactionRoundTrip(t *testing.T) {
 		50_000_000, // 50ms
 	)
 
-	redactor := pii.NewRedactor()
+	pe := pii.NewPolicyEngine()
+	redactor := pii.NewRedactor(pe)
 	rehydrator := pii.NewRehydrator()
 
 	tests := []struct {
@@ -73,7 +75,7 @@ func TestEndToEnd_PIIRedactionRoundTrip(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			tm, err := pii.NewTokenMap()
+			tm, err := pii.NewInMemoryTokenMap()
 			if err != nil {
 				t.Fatalf("NewTokenMap: %v", err)
 			}
@@ -94,7 +96,7 @@ func TestEndToEnd_PIIRedactionRoundTrip(t *testing.T) {
 			}
 
 			// Redact.
-			redacted, spans := redactor.Redact(tc.input, matches, tm)
+			redacted, spans := redactor.Redact(tc.input, matches, tm, models.UserContext{Department: "GENERAL"})
 			t.Logf("Redacted: %s", redacted)
 
 			if len(spans) == 0 {
@@ -165,7 +167,7 @@ func TestEndToEnd_MockLLMProxy(t *testing.T) {
 // TestEndToEnd_HMACInjectionPrevention verifies that forged tokens
 // are NOT rehydrated.
 func TestEndToEnd_HMACInjectionPrevention(t *testing.T) {
-	tm, err := pii.NewTokenMap()
+	tm, err := pii.NewInMemoryTokenMap()
 	if err != nil {
 		t.Fatalf("NewTokenMap: %v", err)
 	}

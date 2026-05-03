@@ -1,0 +1,67 @@
+networks:
+  pii_net:
+    driver: bridge
+
+services:
+  redis:
+    image: redis:alpine
+    container_name: pii-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    restart: always
+    networks:
+      - pii_net
+    volumes:
+      - redis_data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  ner-sidecar:
+    build:
+      context: ./sidecar/ner
+      dockerfile: Dockerfile
+    container_name: pii-ner-sidecar
+    ports:
+      - "127.0.0.1:50051:50051"
+    restart: always
+    networks:
+      - pii_net
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+
+  pii-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pii-gateway
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    restart: always
+    networks:
+      - pii_net
+    depends_on:
+      redis:
+        condition: service_healthy
+      ner-sidecar:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+volumes:
+  redis_data:

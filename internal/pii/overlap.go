@@ -9,9 +9,9 @@ import (
 // The buffer retains the last N bytes from the previous chunk and
 // prepends them to the current chunk for scanning.
 type OverlapBuffer struct {
-	mu       sync.Mutex
-	size     int    // how many bytes to retain
-	buffer   []byte // retained bytes from previous chunk
+	mu     sync.Mutex
+	size   int    // how many bytes to retain
+	buffer []byte // retained bytes from previous chunk
 }
 
 // NewOverlapBuffer creates an overlap buffer with the given size.

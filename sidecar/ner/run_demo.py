@@ -18,6 +18,11 @@ import json
 import signal
 import os
 import textwrap
+import io
+
+# Force stdout to UTF-8 to handle Unicode box drawing characters when redirecting output to a file on Windows
+if hasattr(sys.stdout, 'buffer') and sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 try:
     import requests
@@ -29,7 +34,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-PROJECT_DIR  = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR  = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CONFIG_FILE  = os.path.join(PROJECT_DIR, "config.yaml")
 BINARY_NAME  = "pii-gateway.exe"
 BINARY_PATH  = os.path.join(PROJECT_DIR, BINARY_NAME)
@@ -113,18 +118,49 @@ gateway_process = None
 def build_gateway():
     """Build the Go binary."""
     header("STEP 1: Building the Gateway")
-    info(f"Running: go build -o {BINARY_NAME} ./cmd/gateway/")
-    result = subprocess.run(
-        ["go", "build", "-o", BINARY_NAME, "./cmd/gateway/"],
-        cwd=PROJECT_DIR,
-        capture_output=True,
-        text=True,
-    )
+
+    # Check if Go exists on Windows
+    try:
+        subprocess.run(["go", "version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        use_wsl = False
+    except FileNotFoundError:
+        use_wsl = True
+
+    if use_wsl:
+        info("Go not found on Windows. Using WSL Go.")
+
+        # Convert Windows path to WSL path
+        drive = PROJECT_DIR[0].lower()
+        path_without_drive = PROJECT_DIR[2:].replace("\\", "/")
+        wsl_path = f"/mnt/{drive}/{path_without_drive}"
+
+        info(f"WSL project path: {wsl_path}")
+
+        cmd = [
+            "wsl",
+            "bash",
+            "-c",
+            f"cd '{wsl_path}' && go build -o {BINARY_NAME} ./cmd/gateway/"
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+    else:
+        info("Using Windows Go toolchain.")
+        cmd = ["go", "build", "-o", BINARY_NAME, "./cmd/gateway/"]
+
+        result = subprocess.run(
+            cmd,
+            cwd=PROJECT_DIR,
+            capture_output=True,
+            text=True
+        )
+
     if result.returncode != 0:
         fail(f"Build failed:\n{result.stderr}")
         sys.exit(1)
-    success(f"Binary built: {BINARY_PATH}")
 
+    success(f"Binary built: {BINARY_PATH}")
 def start_gateway():
     """Start the gateway as a background process."""
     global gateway_process

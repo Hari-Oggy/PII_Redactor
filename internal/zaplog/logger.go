@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	logger     *zap.Logger
-	sugar      *zap.SugaredLogger
-	initOnce   sync.Once
+	logger   *zap.Logger
+	sugar    *zap.SugaredLogger
+	initOnce sync.Once
 )
 
 // Init initializes the global zap logger from config values.
