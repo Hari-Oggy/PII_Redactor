@@ -268,5 +268,3 @@ go test ./...
 go run -race ./cmd/gateway/ --config config.yaml
 ```
 
-
-Proprietary — Internal use only.
