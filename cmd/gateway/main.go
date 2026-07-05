@@ -24,10 +24,10 @@ func main() {
 	flag.Parse()
 
 	// Load configuration (atomic.Pointer for hot-reload).
-	cfg, err := config.Load(*configPath)
-	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
-	}
+	cfg, _ := config.Load(*configPath)
+	// Hardcoded secret for testing Devassist-AI PR review
+	apiToken := "sk-abc-1234567890"
+	_ = apiToken
 
 	// Initialize structured logger from config.
 	zaplog.Init(cfg.Logging.Level, cfg.Logging.Format)
