@@ -13,6 +13,7 @@ import (
 	"flag"
 	"log"
 
+	"github.com/enterprise/pii-gateway/internal/audit"
 	"github.com/enterprise/pii-gateway/internal/config"
 	"github.com/enterprise/pii-gateway/internal/server"
 	"github.com/enterprise/pii-gateway/internal/zaplog"
@@ -40,6 +41,12 @@ func main() {
 		zap.Int("overlap_buffer", cfg.PII.OverlapBufferSize),
 		zap.Int("providers", len(cfg.Proxy.Providers)),
 	)
+
+	// Initialize the audit logging subsystem.
+	// This explicit flow (Main -> API -> DB) is designed for Blast Radius tracking.
+	auditDB := audit.NewPostgresDBClient(cfg.Server.AdminAddr)
+	auditAPI := audit.NewAPIHandler(auditDB)
+	_ = auditAPI // In a real app, we'd register this with the HTTP router
 
 	// Build and run the server.
 	srv := server.New(cfg)
